@@ -33,21 +33,12 @@ def comprimir_pdf_ghostscript(entrada, salida):
     return False  # Ninguna opción funcionó
 
 # Función que genera la ruta interna transformada para el ZIP.
-# new_root: cadena dinámica (ej. "Pepsi (1-2)")
-# dyn_index: el índice dinámico que se aplicará en cada subnivel (ej. "1-2" o "2-2")
+# Ahora sólo se antepone new_root y se mantiene la estructura relativa.
 def crear_arcname(archivo, origen_carpeta, new_root, dyn_index):
-    rel = os.path.relpath(archivo, origen_carpeta)  # Ej: "proveedores/pólizas de almacen/archivo1.pdf"
-    dir_rel = os.path.dirname(rel)
-    file_name = os.path.basename(rel)
-    if not dir_rel:
-        return os.path.join(new_root, file_name)
-    componentes = dir_rel.split(os.sep)
-    acumulado = new_root
-    carpetas = [new_root]
-    for comp in componentes:
-        acumulado = f"{acumulado} {comp} ({dyn_index})"
-        carpetas.append(acumulado)
-    return os.path.join(*carpetas, file_name)
+    # Relativa completa del archivo dentro de origen
+    rel = os.path.relpath(archivo, origen_carpeta)
+    # Dentro del ZIP, la carpeta raíz incluirá el new_root (con índice) y luego la ruta relativa original
+    return os.path.join(new_root, rel)
 
 # Función principal para procesar archivos (copiar/comprimir) en la carpeta de origen
 def comprimir_pdfs():
@@ -72,8 +63,8 @@ def comprimir_pdfs():
     progress["maximum"] = total_archivos
     progress["value"] = 0
 
-    # Se copia el contenido interno (lo que está adentro de la carpeta origen) al destino seleccionado
-    destino_final = destino  # Trabajamos directamente con lo de adentro
+    # Copiamos archivos (compress PDF o copy otros)
+    destino_final = destino
     for i, ruta_archivo in enumerate(archivos_a_procesar, start=1):
         rel_path = os.path.relpath(os.path.dirname(ruta_archivo), origen)
         destino_dir = os.path.join(destino_final, rel_path)
@@ -93,8 +84,7 @@ def comprimir_pdfs():
 
     messagebox.showinfo("Listo", "Todos los archivos han sido procesados.")
 
-    # Suponemos que los contenidos adentro de la carpeta origen ya fueron copiados al destino.
-    # Ahora, para comprimir, se procesarán las subcarpetas de la carpeta origen (es decir, se ignora la carpeta base).
+    # Procesamos subcarpetas para generar ZIPs
     subcarpetas = [
         d for d in os.listdir(origen)
         if os.path.isdir(os.path.join(origen, d))
@@ -104,12 +94,12 @@ def comprimir_pdfs():
         return
 
     for sub in subcarpetas:
-        path_sub = os.path.join(destino_final, sub)  # trabajar con lo que se copió
+        path_sub = os.path.join(destino_final, sub)
         comprimir_subcarpeta(path_sub, destino_final)
 
     messagebox.showinfo("Proceso finalizado", "Compresión y generación de ZIPs finalizada.\nRevisa la carpeta ZIPS en el destino.")
 
-# Función para procesar y comprimir cada subcarpeta (por ejemplo, "Punto1", "Punto2", etc.)
+# Función para procesar y comprimir cada subcarpeta
 def comprimir_subcarpeta(path_subcarpeta, destino):
     nombre_sub = os.path.basename(path_subcarpeta)
     archivos = []
@@ -121,12 +111,11 @@ def comprimir_subcarpeta(path_subcarpeta, destino):
         print(f"No se encontraron archivos en {path_subcarpeta}")
         return
 
-    # Se generan ZIP(s) para esta subcarpeta en la carpeta ZIPS
     carpeta_zips = os.path.join(destino, "ZIPS")
     os.makedirs(carpeta_zips, exist_ok=True)
     dividir_y_comprimir_carpeta(path_subcarpeta, carpeta_zips, nombre_sub)
 
-# Función para dividir los archivos de una subcarpeta en partes (si es mayor a 4 MB) y generar ZIP(s).
+# Función para dividir los archivos de una subcarpeta en partes y generar ZIP(s).
 def dividir_y_comprimir_carpeta(origen_carpeta, destino_zip, base_name):
     archivos = []
     for root, _, files in os.walk(origen_carpeta):
@@ -134,11 +123,10 @@ def dividir_y_comprimir_carpeta(origen_carpeta, destino_zip, base_name):
             ruta = os.path.join(root, f)
             size_mb = os.path.getsize(ruta) / (1024*1024)
             archivos.append((ruta, size_mb))
-    
     if not archivos:
         print(f"No hay archivos en {origen_carpeta}")
         return
-    
+
     partes = []
     parte_actual = []
     tam_actual = 0
@@ -152,9 +140,8 @@ def dividir_y_comprimir_carpeta(origen_carpeta, destino_zip, base_name):
     if parte_actual:
         partes.append(parte_actual)
     total_partes = len(partes)
-    
+
     for i, parte in enumerate(partes, start=1):
-        # El índice dinámico será "i-total_partes", que queremos usar en toda la estructura interna.
         dyn_index = f"{i}-{total_partes}"
         new_root = f"{base_name} ({dyn_index})"
         nombre_zip = f"{new_root}.zip"
@@ -165,7 +152,8 @@ def dividir_y_comprimir_carpeta(origen_carpeta, destino_zip, base_name):
                 zipf.write(archivo, arcname)
         print(f"ZIP creado: {ruta_zip}")
 
-# Funciones de selección de carpetas en la interfaz
+# Funciones de selección de carpetas
+
 def seleccionar_carpeta_origen():
     carpeta = filedialog.askdirectory()
     if carpeta:
