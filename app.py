@@ -6,6 +6,7 @@ import subprocess
 import zipfile
 import shutil
 from collections import defaultdict
+import platform
 
 # Parámetros
 MAX_ZIP_SIZE_MB = 4
@@ -14,9 +15,20 @@ EXTENSIONES_VALIDAS = [".pdf", ".doc", ".docx", ".xls", ".xlsx"]
 # Función para comprimir un PDF usando Ghostscript
 def comprimir_pdf_ghostscript(entrada, salida):
     opciones = ["/screen", "/ebook", "/printer", "/prepress"]
+
+    sistema = platform.system()
+    if sistema == "Windows":
+        ghostscript_exec = shutil.which("gswin64c") or shutil.which("gswin32c")
+    else:
+        ghostscript_exec = shutil.which("gs")
+
+    if not ghostscript_exec:
+        print("Ghostscript no encontrado. Asegúrate de que esté instalado y en el PATH.")
+        return False        
+
     for opcion in opciones:
         comando = [
-            "gs",
+            ghostscript_exec,
             "-sDEVICE=pdfwrite",
             "-dCompatibilityLevel=1.4",
             f"-dPDFSETTINGS={opcion}",
