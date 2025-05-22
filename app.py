@@ -14,7 +14,8 @@ EXTENSIONES_VALIDAS = [".pdf", ".doc", ".docx", ".xls", ".xlsx"]
 
 # Función para comprimir un PDF usando Ghostscript
 def comprimir_pdf_ghostscript(entrada, salida):
-    opciones = ["/screen", "/ebook", "/printer", "/prepress"]
+    # opciones = ["/screen", "/ebook", "/printer", "/prepress"]
+    opciones = ["/ebook", "/printer", "/prepress"]
 
     sistema = platform.system()
     if sistema == "Windows":
